@@ -41,8 +41,11 @@ def make_ratio_feature(numerator, denominator, eps=1e-8):
     # TODO: Form a derived ratio feature from two 1-D arrays with safe division.
     return numerator/(denominator+eps)
 
-# Step 5 - append_column (not yet solved)
-# TODO: implement
+# Step 5 - append_column
+def append_column(X, col):
+    # TODO: Horizontally append one 1-D feature column onto a design matrix.
+    X = np.hstack((X,np.expand_dims(col,axis=1)))
+    return X
 
 # Step 6 - one_hot_encode (not yet solved)
 # TODO: implement
