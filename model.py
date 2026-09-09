@@ -164,8 +164,16 @@ def prepare_cleaned_features(X, iqr_k=1.5):
     X = np.clip(X,lower,upper)
     return X
 
-# Step 20 - assemble_feature_matrix (not yet solved)
-# TODO: implement
+# Step 20 - assemble_feature_matrix
+import numpy as np
+def assemble_feature_matrix(X_num, ratio_num_idx, ratio_den_idx, cat_labels=None):
+    # TODO: build an extended feature matrix by appending a derived ratio...
+    ratio = X_num[:,ratio_num_idx]/X_num[:,ratio_den_idx]
+    ans = np.hstack((X_num,np.expand_dims(ratio,axis=1)))
+    if cat_labels is not None:
+        labels = np.asarray(cat_labels)
+        ans = np.hstack((ans,(labels[:,None]==np.unique(labels)).astype(float)))
+    return ans
 
 # Step 21 - make_train_val_test (not yet solved)
 # TODO: implement
