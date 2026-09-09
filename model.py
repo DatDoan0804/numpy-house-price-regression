@@ -175,8 +175,30 @@ def assemble_feature_matrix(X_num, ratio_num_idx, ratio_den_idx, cat_labels=None
         ans = np.hstack((ans,(labels[:,None]==np.unique(labels)).astype(float)))
     return ans
 
-# Step 21 - make_train_val_test (not yet solved)
-# TODO: implement
+# Step 21 - make_train_val_test
+import numpy as np
+
+def make_train_val_test(X, y, train_ratio, val_ratio, seed):
+    samples = X.shape[0]
+    
+    # Use legacy random seed and permutation to match expected test outputs
+    np.random.seed(seed)
+    indices = np.random.permutation(samples)
+    
+    X = X[indices]
+    y = y[indices]
+    
+    n_train = int(train_ratio * samples)
+    n_val = int(val_ratio * samples)
+    
+    return {
+        "X_train": X[:n_train],
+        "X_val":   X[n_train : n_train + n_val],
+        "X_test":  X[n_train + n_val :],
+        "y_train": y[:n_train],
+        "y_val":   y[n_train : n_train + n_val],
+        "y_test":  y[n_train + n_val :],
+    }
 
 # Step 22 - standardize_and_add_bias (not yet solved)
 # TODO: implement
