@@ -229,8 +229,23 @@ def standardize_and_add_bias(splits: dict) -> tuple[dict, np.ndarray, np.ndarray
             
     return std_splits, mean, std
 
-# Step 23 - evaluate_predictions (not yet solved)
-# TODO: implement
+# Step 23 - evaluate_predictions
+def evaluate_predictions(y_true, y_pred):
+    # TODO: Bundle MAE, RMSE, R^2, and residual summary into one metrics dict.
+    ans = {}
+    error = y_true-y_pred
+    mean = np.mean(y_true)
+    ans["mae"] = np.mean(np.abs(error))
+    ss_res=np.sum(error**2)
+    ss_tot=np.sum((y_true-mean)**2)
+    ans["r2"] = 1 - (ss_res/ss_tot if ss_tot != 0 else 1)
+    ans["residual_summary"] = {
+        "mean":np.mean(error),
+        "std":np.std(error),
+        "median_abs":np.median(np.abs(error))
+    }
+    ans["rmse"] = np.sqrt(np.mean((error**2)))
+    return ans
 
 # Step 24 - house_price_pipeline (not yet solved)
 # TODO: implement
