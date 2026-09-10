@@ -200,8 +200,34 @@ def make_train_val_test(X, y, train_ratio, val_ratio, seed):
         "y_test":  y[n_train + n_val :],
     }
 
-# Step 22 - standardize_and_add_bias (not yet solved)
-# TODO: implement
+# Step 22 - standardize_and_add_bias
+import numpy as np
+
+def add_bias(X: np.ndarray) -> np.ndarray:
+    """Prepends a column of ones to a feature matrix."""
+    return np.c_[np.ones(X.shape[0]), X]
+
+def standardize_and_add_bias(splits: dict) -> tuple[dict, np.ndarray, np.ndarray]:
+    """
+    Fits standardizer on train set, normalizes all splits, and prepends bias column.
+    """
+    X_train = splits["X_train"]
+    
+    mean = np.mean(X_train, axis=0)
+    std = np.std(X_train, axis=0)
+    
+    # ONLY replace 0-std with 1 to avoid division by zero.
+    # Do NOT use np.maximum(std, 1.0), as it alters valid std values < 1.0.
+    std = np.where(std == 0, 1.0, std)
+    
+    std_splits = {}
+    for key, val in splits.items():
+        if key.startswith("X_"):
+            std_splits[key] = add_bias((val - mean) / std)
+        else:
+            std_splits[key] = val
+            
+    return std_splits, mean, std
 
 # Step 23 - evaluate_predictions (not yet solved)
 # TODO: implement
