@@ -230,23 +230,210 @@ def standardize_and_add_bias(splits: dict) -> tuple[dict, np.ndarray, np.ndarray
     return std_splits, mean, std
 
 # Step 23 - evaluate_predictions
+import numpy as np
+
+
+def add_bias(X: np.ndarray) -> np.ndarray:
+    """Prepends a column of ones to a feature matrix."""
+    return np.c_[np.ones(X.shape[0]), X]
+
+
 def evaluate_predictions(y_true, y_pred):
     # TODO: Bundle MAE, RMSE, R^2, and residual summary into one metrics dict.
     ans = {}
     error = y_true-y_pred
     mean = np.mean(y_true)
     ans["mae"] = np.mean(np.abs(error))
-    ss_res=np.sum(error**2)
-    ss_tot=np.sum((y_true-mean)**2)
+    ss_res = np.sum(error**2)
+    ss_tot = np.sum((y_true-mean)**2)
     ans["r2"] = 1 - (ss_res/ss_tot if ss_tot != 0 else 1)
     ans["residual_summary"] = {
-        "mean":np.mean(error),
-        "std":np.std(error),
-        "median_abs":np.median(np.abs(error))
+        "mean": np.mean(error),
+        "std": np.std(error),
+        "median_abs": np.median(np.abs(error))
     }
     ans["rmse"] = np.sqrt(np.mean((error**2)))
     return ans
 
-# Step 24 - house_price_pipeline (not yet solved)
-# TODO: implement
+
+def house_price_pipeline(X, y, ratio_num_idx, ratio_den_idx, cat_labels=None, train_ratio=0.7, val_ratio=0.15, seed=42, iqr_k=1.5):
+    # TODO: Run full clean->featurize->split->standardize->OLS->evaluate pipeline...
+
+    # CLEAN THE DATA
+    X_mean = np.nan_to_num(np.nanmean(X, axis=0))
+    X = np.where(np.isnan(X), X_mean, X)
+    y_mean = np.nan_to_num(np.nanmean(y))
+    y = np.where(np.isnan(y), y_mean, y)
+
+    q1 = np.percentile(X, 25, axis=0)
+    q3 = np.percentile(X, 75, axis=0)
+    iqr = q3-q1
+    lower = q1-iqr_k*iqr
+    upper = q3+iqr_k*iqr
+    X = np.clip(X, lower, upper)
+
+    # FEATURIZE
+    ratio = X[:, ratio_num_idx]/X[:, ratio_den_idx]
+    X = np.hstack((X, ratio.reshape(-1, 1)))
+    if cat_labels is not None:
+        ohe = (cat_labels[:, None] == np.unique(cat_labels)).astype(float)
+        X = np.hstack((X, ohe))
+
+    # SPLITTING DATAS
+    no_samples = X.shape[0]
+    np.random.seed(seed)
+    indices = np.random.permutation(no_samples)
+
+    X = X[indices]
+    y = y[indices]
+
+    n_train = int(train_ratio * no_samples)
+    n_val = int(val_ratio * no_samples)
+
+    splits = {
+        "X_train": X[:n_train],
+        "X_val":   X[n_train: n_train + n_val],
+        "X_test":  X[n_train + n_val:],
+        "y_train": y[:n_train],
+        "y_val":   y[n_train: n_train + n_val],
+        "y_test":  y[n_train + n_val:],
+    }
+
+    X_train = splits["X_train"]
+    X_train_mean = np.mean(X_train, axis=0)
+    X_train_std = np.std(X_train, axis=0)
+    X_train_std = np.where(X_train_std == 0.0, 1.0, X_train_std)
+
+    std_splits = {}
+    for key, val in splits.items():
+        if key.startswith("X_"):
+            std_splits[key] = add_bias((val - X_train_mean) / X_train_std)
+        else:
+            std_splits[key] = val
+
+    # FIT AND PREDICT
+    X_train = std_splits["X_train"]
+    y_train = std_splits["y_train"]
+    A = X_train.T@X_train
+    b = X_train.T@y_train
+    weights = np.linalg.lstsq(A, b, rcond=None)[0]
+
+    X_test = std_splits["X_test"]
+    X_val = std_splits["X_val"]
+    y_test = std_splits["y_test"]
+    y_val = std_splits["y_val"]
+
+    # EVALUATING THE PREDICTION
+    y_val_pred = X_val @ weights
+    y_test_pred = X_test @ weights
+
+    val_metrics = evaluate_predictions(y_val, y_val_pred)
+    test_metrics = evaluate_predictions(y_test, y_test_pred)
+
+    result = {"theta": weights, "y_test": y_test,
+              "y_test_pred": y_test_pred, "val_metrics": val_metrics, "test_metrics": test_metrics}
+
+    return result
+
+# Step 24 - house_price_pipeline
+import numpy as np
+
+
+def add_bias(X: np.ndarray) -> np.ndarray:
+    """Prepends a column of ones to a feature matrix."""
+    return np.c_[np.ones(X.shape[0]), X]
+
+
+def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
+    """Calculates regression metrics given true and predicted values."""
+    error = y_true - y_pred
+    mse = np.mean(error**2)
+    rmse = np.sqrt(mse)
+    mae = np.mean(np.abs(error))
+
+    ss_res = np.sum(error**2)
+    ss_tot = np.sum((y_true - np.mean(y_true))**2)
+    r2 = 1.0 - (ss_res / ss_tot) if ss_tot != 0.0 else 0.0
+
+    return {"mse": mse, "rmse": rmse, "mae": mae, "r2": r2}
+
+
+def house_price_pipeline(X, y, ratio_num_idx, ratio_den_idx, cat_labels=None, train_ratio=0.7, val_ratio=0.15, seed=42, iqr_k=1.5):
+    # TODO: Run full clean->featurize->split->standardize->OLS->evaluate pipeline...
+
+    # CLEAN THE DATA
+    X_mean = np.nan_to_num(np.nanmean(X, axis=0))
+    X = np.where(np.isnan(X), X_mean, X)
+    y_mean = np.nan_to_num(np.nanmean(y))
+    y = np.where(np.isnan(y), y_mean, y)
+
+    q1 = np.percentile(X, 25, axis=0)
+    q3 = np.percentile(X, 75, axis=0)
+    iqr = q3-q1
+    lower = q1-iqr_k*iqr
+    upper = q3+iqr_k*iqr
+    X = np.clip(X, lower, upper)
+
+    # FEATURIZE
+    ratio = X[:, ratio_num_idx]/X[:, ratio_den_idx]
+    X = np.hstack((X, ratio.reshape(-1, 1)))
+    if cat_labels is not None:
+        ohe = (cat_labels[:, None] == np.unique(cat_labels)).astype(float)
+        X = np.hstack((X, ohe))
+
+    # SPLITTING DATAS
+    no_samples = X.shape[0]
+    np.random.seed(seed)
+    indices = np.random.permutation(no_samples)
+
+    X = X[indices]
+    y = y[indices]
+
+    n_train = int(train_ratio * no_samples)
+    n_val = int(val_ratio * no_samples)
+
+    splits = {
+        "X_train": X[:n_train],
+        "X_val":   X[n_train: n_train + n_val],
+        "X_test":  X[n_train + n_val:],
+        "y_train": y[:n_train],
+        "y_val":   y[n_train: n_train + n_val],
+        "y_test":  y[n_train + n_val:],
+    }
+
+    X_train = splits["X_train"]
+    X_train_mean = np.mean(X_train, axis=0)
+    X_train_std = np.std(X_train, axis=0)
+    X_train_std = np.where(X_train_std == 0.0, 1.0, X_train_std)
+
+    std_splits = {}
+    for key, val in splits.items():
+        if key.startswith("X_"):
+            std_splits[key] = add_bias((val - X_train_mean) / X_train_std)
+        else:
+            std_splits[key] = val
+
+    # FIT AND PREDICT
+    X_train = std_splits["X_train"]
+    y_train = std_splits["y_train"]
+    A = X_train.T@X_train
+    b = X_train.T@y_train
+    weights = np.linalg.lstsq(A, b, rcond=None)[0]
+
+    X_test = std_splits["X_test"]
+    X_val = std_splits["X_val"]
+    y_test = std_splits["y_test"]
+    y_val = std_splits["y_val"]
+
+    # EVALUATING THE PREDICTION
+    y_val_pred = X_val @ weights
+    y_test_pred = X_test @ weights
+
+    val_metrics = compute_metrics(y_val, y_val_pred)
+    test_metrics = compute_metrics(y_test, y_test_pred)
+
+    result = {"theta": weights, "y_test": y_test,
+              "y_test_pred": y_test_pred, "val_metrics": val_metrics, "test_metrics": test_metrics}
+
+    return result
 
