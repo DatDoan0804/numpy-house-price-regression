@@ -344,18 +344,22 @@ def add_bias(X: np.ndarray) -> np.ndarray:
     return np.c_[np.ones(X.shape[0]), X]
 
 
-def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
-    """Calculates regression metrics given true and predicted values."""
-    error = y_true - y_pred
-    mse = np.mean(error**2)
-    rmse = np.sqrt(mse)
-    mae = np.mean(np.abs(error))
-
+def evaluate_predictions(y_true, y_pred):
+    # TODO: Bundle MAE, RMSE, R^2, and residual summary into one metrics dict.
+    ans = {}
+    error = y_true-y_pred
+    mean = np.mean(y_true)
+    ans["mae"] = np.mean(np.abs(error))
     ss_res = np.sum(error**2)
-    ss_tot = np.sum((y_true - np.mean(y_true))**2)
-    r2 = 1.0 - (ss_res / ss_tot) if ss_tot != 0.0 else 0.0
-
-    return {"mse": mse, "rmse": rmse, "mae": mae, "r2": r2}
+    ss_tot = np.sum((y_true-mean)**2)
+    ans["r2"] = 1 - (ss_res/ss_tot if ss_tot != 0 else 1)
+    ans["residual_summary"] = {
+        "mean": np.mean(error),
+        "std": np.std(error),
+        "median_abs": np.median(np.abs(error))
+    }
+    ans["rmse"] = np.sqrt(np.mean((error**2)))
+    return ans
 
 
 def house_price_pipeline(X, y, ratio_num_idx, ratio_den_idx, cat_labels=None, train_ratio=0.7, val_ratio=0.15, seed=42, iqr_k=1.5):
@@ -429,8 +433,8 @@ def house_price_pipeline(X, y, ratio_num_idx, ratio_den_idx, cat_labels=None, tr
     y_val_pred = X_val @ weights
     y_test_pred = X_test @ weights
 
-    val_metrics = compute_metrics(y_val, y_val_pred)
-    test_metrics = compute_metrics(y_test, y_test_pred)
+    val_metrics = evaluate_predictions(y_val, y_val_pred)
+    test_metrics = evaluate_predictions(y_test, y_test_pred)
 
     result = {"theta": weights, "y_test": y_test,
               "y_test_pred": y_test_pred, "val_metrics": val_metrics, "test_metrics": test_metrics}
